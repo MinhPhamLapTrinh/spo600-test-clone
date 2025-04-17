@@ -1,14 +1,10 @@
 // clone-test-core.c
-// Chris Tyler 2017.11.29-2024.11.19 - Licensed under GPLv3.
+// Chris Tyler 2017.11.29‑2024.11.19 - Licensed under GPLv3.
 // For the Seneca College SPO600 Course
 //
-// This code is designed to be compiled with different values for
-// the CLONE_ATTRIBUTE macro for different architectures and for
-// both 'prune' (cloned functions are the same after optimization)
-// and 'noprune' (cloned functions are different after optimization)
-// build cases
-//
-// The cloned function is scale_samples
+// Now with *two* cloned functions: sum_sample and scale_samples.
+// We’ll generate PRUNE for sum_sample (identical clones) and
+// NOPRUNE for scale_samples when FORCE_SCALE_DIFF is defined.
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -16,45 +12,45 @@
 #include <stdbool.h>
 #include "vol.h"
 
+/* Annotate sum_sample so that GCC generates two clones */
+CLONE_ATTRIBUTE
 int sum_sample (int16_t *buff, size_t samples) {
-  int t;
-  for (int x = 0; x < SAMPLES; x++) {
-    t += buff[x];
-  }
-  return t;
+    int t = 0;
+    for (size_t x = 0; x < samples; x++) {
+        t += buff[x];
+    }
+    return t;
 }
 
+/* Annotate scale_samples likewise */
 CLONE_ATTRIBUTE
 void scale_samples(int16_t *in, int16_t *out, int cnt, int volume) {
-	for (int x = 0; x < cnt; x++) {
-		out[x] = ((((int32_t) in[x]) * ((int32_t) (32767 * volume / 100) <<1) ) >> 16);
-	}
+    for (int x = 0; x < cnt; x++) {
+        out[x] = ((((int32_t) in[x]) * ((int32_t) (32767 * volume / 100) << 1)) >> 16);
+    }
+
+    /* This extra statement will only be compiled in when
+       we pass -DFORCE_SCALE_DIFF → it makes the IR differ. */
+#ifdef FORCE_SCALE_DIFF
+    /* introduce one extra GIMPLE stmt so clones differ */
+    int tmp = cnt;
+    (void) tmp;
+#endif
 }
 
 int main() {
-	int		x;
-	int		ttl=0;
+    int     ttl = 0;
 
-// ---- Create in[] and out[] arrays
-	int16_t*	in;
-	int16_t*	out;
-	in =  (int16_t*) calloc(SAMPLES, sizeof(int16_t));
-	out = (int16_t*) calloc(SAMPLES, sizeof(int16_t));
+    // ---- Allocate and fill in[]
+    int16_t *in  = calloc(SAMPLES, sizeof(int16_t));
+    int16_t *out = calloc(SAMPLES, sizeof(int16_t));
+    vol_createsample(in, SAMPLES);
 
-// ---- Create dummy samples in in[]
-	vol_createsample(in, SAMPLES);	
+    // ---- Call our two cloned functions
+    scale_samples(in, out, SAMPLES, VOLUME);
+    ttl = sum_sample(out, SAMPLES);
 
-// ---- This is the part we're interested in!
-// ---- Scale the samples from in[], placing results in out[]
-	scale_samples(in, out, SAMPLES, VOLUME);
-
-// ---- This part sums the samples. 
-        ttl=sum_sample(out, SAMPLES);
-
-// ---- Print the sum of the samples.
-	printf("Result: %d\n", ttl);
-
-	return 0;
-
+    // ---- Print result
+    printf("Result: %d\n", ttl);
+    return 0;
 }
-

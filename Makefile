@@ -3,7 +3,7 @@
 # For the Seneca College SPO600 Course
 
 # Set DUMP_ALL to a non-empty value to enable all GCC dumps
-#DUMP_ALL = 1 
+DUMP_ALL = 1 
 
 AARCH64_BINARIES=clone-test-aarch64-prune clone-test-aarch64-noprune
 X86_BINARIES=clone-test-x86-prune clone-test-x86-noprune
@@ -27,7 +27,8 @@ clone-test-x86-prune:	clone-test-core.c ${LIBRARIES}
 		clone-test-core.c ${LIBRARIES} -o clone-test-x86-prune
 
 clone-test-x86-noprune:	clone-test-core.c ${LIBRARIES}
-	gcc -D 'CLONE_ATTRIBUTE=__attribute__((target_clones("default","arch=x86-64-v3") ))' \
+	gcc -D FORCE_SCALE_DIFF \
+		-D 'CLONE_ATTRIBUTE=__attribute__((target_clones("default","arch=x86-64-v3") ))' \
 		-march=x86-64 ${CFLAGS} \
 		clone-test-core.c ${LIBRARIES} -o clone-test-x86-noprune
 
@@ -48,4 +49,3 @@ clean:
 	rm ${AARCH64_BINARIES} ${X86_BINARIES} || true
 	rm ${LIBRARIES} || true
 	rm *.c.* || true	# Should remove compiler dumpfiles
-
